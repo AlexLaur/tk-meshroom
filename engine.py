@@ -37,9 +37,10 @@ class MeshroomEngine(tank.platform.Engine):
     VERSION_OLDEST_COMPATIBLE = 2025
 
     def __init__(self, *args, **kwargs):
-        super(MeshroomEngine, self).__init__(*args, **kwargs)
-
         self._menu_name = self.LONG_MENU_NAME
+        self._menu_generator = None
+
+        super(MeshroomEngine, self).__init__(*args, **kwargs)
 
     @property
     def context_change_allowed(self):
@@ -142,6 +143,7 @@ class MeshroomEngine(tank.platform.Engine):
         # TODO show compatibility warning for new versions
         # Read SGTK_COMPATIBILITY_DIALOG_SHOWN to know what to do
 
+        # self._menu_name = self.LONG_MENU_NAME
         if self.get_setting("use_short_menu_name", False):
             self._menu_name = self.SHORT_MENU_NAME
 
@@ -150,37 +152,12 @@ class MeshroomEngine(tank.platform.Engine):
             # rebuilding:
             self.logger.debug("Registered open and save callbacks.")
 
-    def create_shotgun_menu(self):
-        """
-        Creates the main shotgun menu in meshroom.
-        Note that this only creates the menu, not the child actions
-        :return: bool
-        """
-
-        # only create the shotgun menu if not in batch mode and menu doesn't
-        # already exist
-        if self.has_ui:
-            tk_meshroom = self.import_module("tk_meshroom")
-            self._menu_generator = tk_meshroom.MenuGenerator(
-                self, self._menu_name
-            )
-            self._menu_generator.create_menu()
-            return True
-
-        return False
-
-    def display_menu(self, pos=None):
-        """
-        Shows the engine Shotgun menu.
-        """
-        pass
-
     def post_app_init(self):
         """
         Called when all apps have initialized
         """
-        # self.create_shotgun_menu()
-        pass
+        self.create_shotgun_menu()
+        self._menu_generator.show()
 
     def post_context_change(self, old_context, new_context):
         """
@@ -204,5 +181,33 @@ class MeshroomEngine(tank.platform.Engine):
 
             # finally create the menu with the new context if needed
             if old_context != new_context:
-                # self.create_shotgun_menu()
-                pass
+                self.create_shotgun_menu()
+
+            self.sgtk.execute_core_hook_method(
+                tank.platform.constants.CONTEXT_CHANGE_HOOK,
+                "post_context_change",
+                previous_context=old_context,
+                current_context=new_context,
+            )
+
+    def destroy_engine(self):
+        self.logger.debug("%s: Destroying...", self)
+        self._menu_generator.destroy()
+
+    def create_shotgun_menu(self, disabled=False):
+        """
+        Creates the main shotgun menu in meshroom.
+        Note that this only creates the menu, not the child actions
+        :return: bool
+        """
+        # only create the shotgun menu if not in batch mode and menu doesn't
+        # already exist
+        if self.has_ui:
+            tk_meshroom = self.import_module("tk_meshroom")
+            self._menu_generator = tk_meshroom.MenuGenerator(
+                self, self._menu_name
+            )
+            self._menu_generator.create_menu(disabled=disabled)
+            return True
+
+        return False
