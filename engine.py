@@ -10,7 +10,7 @@ import meshroom
 from tank.util import is_windows, is_linux, is_macos
 
 
-def _path_pyside6_for_tank():
+def _patch_pyside6_for_tank():
     try:
         from PySide6 import QtWebEngineWidgets, QtWebEngineCore
     except ImportError:
@@ -24,7 +24,7 @@ def _path_pyside6_for_tank():
         PySide6.QtWebEngineWidgets = None
 
 
-_path_pyside6_for_tank()
+_patch_pyside6_for_tank()
 
 
 class MeshroomEngine(tank.platform.Engine):
