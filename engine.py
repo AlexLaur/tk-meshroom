@@ -2,6 +2,7 @@
 
 __author__ = "Laurette Alexandre"
 
+import os
 import sgtk
 import tank
 
@@ -27,6 +28,64 @@ def _patch_pyside6_for_tank():
 _patch_pyside6_for_tank()
 
 
+def update_engine_context():
+    engine = tank.platform.current_engine()
+
+    if not engine:
+        # If we don't have an engine for some reason then we don't have
+        # anything to do.
+        return
+
+    scene_path = engine.meshroom_graph.filepath
+
+    if not scene_path:
+        return
+
+    scene_path = os.path.abspath(scene_path)
+
+    # we are going to try to figure out the context based on the
+    # active document
+    current_ctx = engine.context
+
+    try:
+        # and construct the new context for this path:
+        tk = sgtk.sgtk_from_path(scene_path)
+    except tank.TankError:
+        # could not detect context from path, will use the project context
+        # for menus if it exists
+        message = (
+            "Flow Production Tracking Meshroom Engine could not detect "
+            "the context from the active document. "
+            f"FPTR menus will be stay in the current context '{current_ctx}'."
+        )
+        print(message)
+        return
+
+    new_ctx = tk.context_from_path(scene_path, current_ctx)
+
+    if not new_ctx:
+        project_name = engine.context.project.get("name")
+        project_ctx = tk.context_from_entity_dictionary(current_ctx)
+        message = (
+            "Could not extract a context from the current active project "
+            f"path, so we revert to the current project '{project_name}' context: '{project_ctx}'."
+        )
+        print(message)
+        return
+
+    # Only change if the context is different
+    if new_ctx != current_ctx:
+        try:
+            engine.change_context(new_ctx)
+        except tank.TankError:
+            message = (
+                "Flow Production Tracking Meshroom Engine could not change "
+                "context from the active document. FPTR menu will be disabled."
+            )
+            print(message)
+            engine.create_shotgun_menu(disabled=True)
+
+
 class MeshroomEngine(tank.platform.Engine):
     """
     Toolkit engine for Meshroom.
@@ -39,8 +98,13 @@ class MeshroomEngine(tank.platform.Engine):
     def __init__(self, *args, **kwargs):
         self._menu_name = self.LONG_MENU_NAME
         self._menu_generator = None
+        self._meshroom_graph = None
 
         super(MeshroomEngine, self).__init__(*args, **kwargs)
+
+    @property
+    def meshroom_graph(self):
+        return self._meshroom_graph.graph
 
     @property
     def context_change_allowed(self):
@@ -159,6 +223,12 @@ class MeshroomEngine(tank.platform.Engine):
         self.create_shotgun_menu()
         self._menu_generator.show()
 
+        from tank.platform.qt6 import QtWidgets
+
+        app = QtWidgets.QApplication.instance()
+        self._meshroom_graph = app._activeProject
+        self._meshroom_graph.graphChanged.connect(update_engine_context)
+
     def post_context_change(self, old_context, new_context):
         """
         Runs after a context change.
@@ -192,6 +262,12 @@ class MeshroomEngine(tank.platform.Engine):
 
     def destroy_engine(self):
         self.logger.debug("%s: Destroying...", self)
+
+        from tank.platform.qt6 import QtWidgets
+
+        app = QtWidgets.QApplication.instance()
+        app._activeProject.graphChanged.connect(on_graph_changed)
+
         self._menu_generator.destroy()
 
     def create_shotgun_menu(self, disabled=False):
