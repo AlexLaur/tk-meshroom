@@ -36,9 +36,11 @@ def update_engine_context():
         # anything to do.
         return
 
+    engine.logger.debug("Updating engine context...")
     scene_path = engine.meshroom_graph.filepath
 
     if not scene_path:
+        engine.logger.info("No scene path. No need to change the context.")
         return
 
     scene_path = os.path.abspath(scene_path)
@@ -58,7 +60,7 @@ def update_engine_context():
             "the context from the active document. "
             f"FPTR menus will be stay in the current context '{current_ctx}'."
         )
-        print(message)
+        engine.logger.error(message)
         return
 
     new_ctx = tk.context_from_path(scene_path, current_ctx)
@@ -70,19 +72,20 @@ def update_engine_context():
             "Could not extract a context from the current active project "
             f"path, so we revert to the current project '{project_name}' context: '{project_ctx}'."
         )
-        print(message)
+        engine.logger.warning(message)
         return
 
     # Only change if the context is different
     if new_ctx != current_ctx:
         try:
             engine.change_context(new_ctx)
+            engine.logger.info("Context changed.")
         except tank.TankError:
             message = (
                 "Flow Production Tracking Meshroom Engine could not change "
                 "context from the active document. FPTR menu will be disabled."
             )
-            print(message)
+            engine.logger.error(message)
             engine.create_shotgun_menu(disabled=True)
 
 
