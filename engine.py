@@ -63,8 +63,12 @@ def update_engine_context():
         # anything to do.
         return
 
+    if not engine.has_ui:
+        # How to get the filepath of the pipeline whithout the UiInsance ?
+        return
+
     engine.logger.debug("Updating engine context...")
-    scene_path = engine.meshroom_graph.filepath
+    scene_path = meshroom.ui.uiInstance.activeProject.graph.filepath
 
     if not scene_path:
         engine.logger.info("No scene path. No need to change the context.")
@@ -128,13 +132,8 @@ class MeshroomEngine(tank.platform.Engine):
     def __init__(self, *args, **kwargs):
         self._menu_name = self.LONG_MENU_NAME
         self._menu_generator = None
-        self._meshroom_graph = None
 
         super(MeshroomEngine, self).__init__(*args, **kwargs)
-
-    @property
-    def meshroom_graph(self):
-        return self._meshroom_graph.graph
 
     @property
     def context_change_allowed(self):
@@ -250,14 +249,17 @@ class MeshroomEngine(tank.platform.Engine):
         """
         Called when all apps have initialized
         """
+        if self.has_ui:
+            meshroom.ui.uiInstance.activeProject.graphChanged.connect(
+                update_engine_context
+            )
+
+            tk_meshroom = self.import_module("tk_meshroom")
+            self._menu_generator = tk_meshroom.MenuGenerator(
+                self, self._menu_name
+            )
+
         self.create_shotgun_menu()
-        self._menu_generator.show()
-
-        from tank.platform.qt6 import QtWidgets
-
-        app = QtWidgets.QApplication.instance()
-        self._meshroom_graph = app._activeProject
-        self._meshroom_graph.graphChanged.connect(update_engine_context)
 
     def post_context_change(self, old_context, new_context):
         """
@@ -293,10 +295,10 @@ class MeshroomEngine(tank.platform.Engine):
     def destroy_engine(self):
         self.logger.debug("%s: Destroying...", self)
 
-        from tank.platform.qt6 import QtWidgets
-
-        app = QtWidgets.QApplication.instance()
-        app._activeProject.graphChanged.connect(on_graph_changed)
+        if self.has_ui:
+            meshroom.ui.uiInstance.activeProject.graphChanged.disconnect(
+                update_engine_context
+            )
 
         self._menu_generator.destroy()
 
@@ -308,12 +310,7 @@ class MeshroomEngine(tank.platform.Engine):
         """
         # only create the shotgun menu if not in batch mode and menu doesn't
         # already exist
-        if self.has_ui:
-            tk_meshroom = self.import_module("tk_meshroom")
-            self._menu_generator = tk_meshroom.MenuGenerator(
-                self, self._menu_name
-            )
+        if self.has_ui and self._menu_generator:
             self._menu_generator.create_menu(disabled=disabled)
             return True
-
         return False

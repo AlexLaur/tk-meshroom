@@ -26,7 +26,7 @@
 # license agreement between you and Autodesk / Shotgun.
 #
 
-# import meshroom
+from meshroom.ui import uiInstance
 
 import sgtk
 from sgtk.platform.qt6 import QtWidgets
@@ -83,12 +83,9 @@ class SceneOperation(HookClass):
                                                  state, otherwise False
                                 all others     - None
         """
-        # TODO Meshroom should provide a basic API to open, save...
-        meshroom_api = QtWidgets.QApplication.instance()._activeProject
-
         if operation == "current_path":
             # return the current scene path
-            return meshroom_api.graph.filepath
+            return uiInstance.activeProject.graph.filepath
 
         elif operation == "prepare_new":
             # tk-multi-workfile doesn't popup the save windows when the user
@@ -99,17 +96,17 @@ class SceneOperation(HookClass):
         elif operation == "open":
             # do new scene as Maya doesn't like opening
             # the scene it currently has open!
-            meshroom_api.graph.load(file_path)
+            uiInstance.activeProject.graph.load(file_path)
 
         elif operation == "save":
             # save the current scene:
-            meshroom_api.graph.save()
+            uiInstance.activeProject.graph.save()
 
         elif operation == "save_as":
-            meshroom_api.saveAs(file_path)
+            uiInstance.activeProject.saveAs(file_path)
 
         elif operation == "reset":
-            if not meshroom_api.undoStack.clean:
+            if not uiInstance.activeProject.undoStack.clean:
                 # Unsaved pipeline
 
                 res = QtWidgets.QMessageBox.question(
@@ -126,11 +123,11 @@ class SceneOperation(HookClass):
                 elif res == QtWidgets.QMessageBox.No:
                     pass
                 else:
-                    if not meshroom_api.graph.filepath:
+                    if not uiInstance.activeProject.graph.filepath:
                         # Save as temp, really ?
-                        meshroom_api.graph.saveAsTemp()
+                        uiInstance.activeProject.graph.saveAsTemp()
                     else:
-                        meshroom_api.graph.save()
+                        uiInstance.activeProject.graph.save()
 
-            meshroom_api.new()
+            uiInstance.activeProject.new()
             return True

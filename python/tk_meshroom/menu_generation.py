@@ -25,9 +25,12 @@
 # Your use of the Shotgun Pipeline Toolkit is governed by the applicable
 # license agreement between you and Autodesk / Shotgun.
 #
+
 import os
 import sys
 import sgtk
+import meshroom
+
 from typing import Callable, Optional
 from tank.platform.qt6 import QtQuick, QtWidgets, QtCore, QtGui
 
@@ -58,8 +61,22 @@ class FPTRPersistentMenuBar(QtWidgets.QWidget):
 
         self.move(x_pos, y_pos + 55)
 
+        # Hide/Show and Move menu according to the main app
         app = QtWidgets.QApplication.instance()
         app.focusWindowChanged.connect(self._on_focus_window_changed)
+
+        # Hide/Show menu according to the page inside Meshroom (Application.qml or Homepage.qml)
+        root = app.engine.rootObjects()[0]
+        stackview_obj = None
+        for child in root.findChildren(QtCore.QObject):
+            if "StackView" in child.metaObject().className():
+                stackview_obj = child
+                break
+
+        if stackview_obj:
+            stackview_obj.currentItemChanged.connect(
+                self._on_stackview_current_item_changed
+            )
 
     @property
     def menu(self) -> QtWidgets.QMenu:
@@ -79,14 +96,25 @@ class FPTRPersistentMenuBar(QtWidgets.QWidget):
             self.hide()
             return
 
-        self.show()
-
         if not isinstance(focus_window, QtQuick.QQuickWindow):
             # It is not the main window, nothing to do
             return
 
+        if not meshroom.ui.uiInstance.activeProject.active:
+            # We are not in the Application.qml but Homepage.qml
+            return
+
+        self.show()
+
         # It is the main window, we need to move the menu to the right position
         self.move(self._x + focus_window.x(), self._y + focus_window.y())
+
+    def _on_stackview_current_item_changed(self):
+        # TODO should check on which page we are ?
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
 
 
 class MenuGenerator(object):
@@ -107,8 +135,8 @@ class MenuGenerator(object):
                 menubar = child
                 break
 
-        x_pos = 0
-        y_pos = 0
+        x_pos = 238  # Magic number
+        y_pos = 5  # Magic number
         if menubar:
             x_pos = menubar.x() + menubar.width()
             y_pos = menubar.y() + 5
@@ -120,9 +148,6 @@ class MenuGenerator(object):
 
     ###########################################################################
     # public methods
-
-    def show(self) -> None:
-        self._fptr_menu_widget.show()
 
     def destroy(self) -> None:
         self._fptr_menu_widget.deleteLater()
