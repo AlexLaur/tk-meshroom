@@ -171,7 +171,9 @@ class MeshroomEngine(tank.platform.Engine):
         """
         Detect and return if meshroom is running in batch mode
         """
-        return bool(getattr(meshroom.ui, "uiInstance", None))
+        if getattr(meshroom, "ui", None):
+            return bool(getattr(meshroom.ui, "uiInstance", None))
+        return False
 
     ##########################################################################################
     # init and destroy
